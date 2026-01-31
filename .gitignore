@@ -1,0 +1,6 @@
+# packaging artifacts
+*.egg-info/
+dist/
+build/
+__pycache__/
+*.pyc
