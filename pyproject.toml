@@ -51,6 +51,7 @@ pretty = true
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+pythonpath = ["src"]
 
 [build-system]
 requires = ["setuptools>=69", "wheel"]

@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
+from datetime import date
 from pathlib import Path
+from typing import cast
 
 import pandas as pd
 
@@ -26,23 +28,50 @@ class GoogleFitSource(DataSource):
         if not self._paths.root.exists():
             raise FileNotFoundError(str(self._paths.root))
 
-    def daily_metrics_csv(self) -> Path:
-        """Return the consolidated 'Métricas de actividad diaria.csv' if present."""
+    def daily_metrics_files(self) -> list[Path]:
+        """Return per-day CSV files for daily activity metrics."""
         metrics_dir = self._paths.root / "Métricas de actividad diaria"
-        consolidated = metrics_dir / "Métricas de actividad diaria.csv"
-        if consolidated.exists():
-            return consolidated
-        raise FileNotFoundError(str(consolidated))
+        if not metrics_dir.exists():
+            raise FileNotFoundError(str(metrics_dir))
 
-    def load_daily(self, csv_path: Path) -> pd.DataFrame:
-        """Load daily metrics to a normalized DataFrame.
+        files = sorted(
+            p
+            for p in metrics_dir.glob("*.csv")
+            if p.name.lower() != "métricas de actividad diaria.csv".lower()
+        )
+        if files:
+            return files
+        raise FileNotFoundError(str(metrics_dir))
+
+    def load_daily(self, csv_paths: list[Path]) -> pd.DataFrame:
+        """Load daily metrics from per-day CSVs.
 
         Returns DataFrame columns:
             date, steps, distance_m, calories_kcal, active_minutes
         """
-        df = pd.read_csv(csv_path)
-        norm = _normalize_daily_metrics(df)
-        return norm
+        rows: list[dict[str, object]] = []
+        for csv_path in csv_paths:
+            file_date = _date_from_filename(csv_path)
+            if not file_date:
+                continue
+            df = pd.read_csv(csv_path)
+            row = _summarize_daily_file(df, file_date)
+            if row:
+                rows.append(row)
+
+        if not rows:
+            return pd.DataFrame(
+                columns=[
+                    "date",
+                    "steps",
+                    "distance_m",
+                    "calories_kcal",
+                    "active_minutes",
+                ]
+            )
+
+        out = pd.DataFrame(rows).sort_values("date").reset_index(drop=True)
+        return out
 
 
 def _find_col(columns: list[str], patterns: list[str]) -> str | None:
@@ -54,38 +83,44 @@ def _find_col(columns: list[str], patterns: list[str]) -> str | None:
     return None
 
 
-def _normalize_daily_metrics(df: pd.DataFrame) -> pd.DataFrame:
+def _summarize_daily_file(
+    df: pd.DataFrame, file_date: date
+) -> dict[str, object] | None:
     if df.empty:
-        return pd.DataFrame(
-            columns=["date", "steps", "distance_m", "calories_kcal", "active_minutes"]
-        )
+        return None
 
     df = df.rename(columns={c: c.strip() for c in df.columns})
     cols = list(df.columns)
-
-    date_col = _find_col(cols, [r"\b(fecha|date)\b"])
-    if not date_col:
-        return pd.DataFrame(
-            columns=["date", "steps", "distance_m", "calories_kcal", "active_minutes"]
-        )
 
     steps_col = _find_col(cols, [r"\bpasos\b", r"\bstep"])
     dist_col = _find_col(cols, [r"\bdistancia\b", r"\bdistance"])
     cal_col = _find_col(cols, [r"\bcalor", r"\bcalorie"])
     act_col = _find_col(cols, [r"minutos activos", r"active minutes", r"\bactive_min"])
 
-    out = pd.DataFrame()
-    out["date"] = pd.to_datetime(df[date_col], errors="coerce").dt.date
-
-    def num(series_name: str | None) -> pd.Series:
+    def sum_or_na(series_name: str | None) -> float | int | None:
         if not series_name:
-            return pd.Series([pd.NA] * len(df))
-        return pd.to_numeric(df[series_name], errors="coerce")
+            return None
+        result = pd.to_numeric(df[series_name], errors="coerce").sum(min_count=1)
+        if pd.isna(result):
+            return None
+        if hasattr(result, "item"):
+            return cast(float | int, result.item())
+        return cast(float | int, result)
 
-    out["steps"] = num(steps_col)
-    out["distance_m"] = num(dist_col)
-    out["calories_kcal"] = num(cal_col)
-    out["active_minutes"] = num(act_col)
+    return {
+        "date": file_date,
+        "steps": sum_or_na(steps_col),
+        "distance_m": sum_or_na(dist_col),
+        "calories_kcal": sum_or_na(cal_col),
+        "active_minutes": sum_or_na(act_col),
+    }
 
-    out = out.dropna(subset=["date"]).sort_values("date").reset_index(drop=True)
-    return out
+
+def _date_from_filename(path: Path) -> date | None:
+    match = re.match(r"(\d{4}-\d{2}-\d{2})", path.stem)
+    if not match:
+        return None
+    parsed = pd.to_datetime(match.group(1), errors="coerce")
+    if pd.isna(parsed):
+        return None
+    return cast(date, parsed.date())
