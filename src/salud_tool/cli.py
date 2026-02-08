@@ -8,11 +8,7 @@ from pathlib import Path
 
 from dateutil import tz
 
-from salud_tool.consolidate import (
-    consolidate_daily,
-    daily_glucose_summary,
-    readings_to_frame,
-)
+from salud_tool.consolidate import consolidate_readings, readings_to_frame
 from salud_tool.excel_writer import ExcelLayout, write_doctor_xlsx
 from salud_tool.sources.accuchek import AccuChekPaths, AccuChekSource
 from salud_tool.sources.google_fit import GoogleFitPaths, GoogleFitSource
@@ -62,12 +58,13 @@ def main() -> int:
     readings = acc.load_readings(acc_file)
 
     glucose_events = readings_to_frame(readings)
-    glucose_daily = daily_glucose_summary(glucose_events)
-
     fit_csvs = fit.daily_metrics_files()
     fit_daily = fit.load_daily(fit_csvs)
 
-    consolidated = consolidate_daily(glucose_daily=glucose_daily, fit_daily=fit_daily)
+    consolidated = consolidate_readings(
+        glucose_events=glucose_events,
+        fit_daily=fit_daily,
+    )
 
     out_dir = base / "salidas"
     ts = datetime.now(tz=_LOCAL_TZ).strftime("%Y-%m-%d_%H-%M-%S")

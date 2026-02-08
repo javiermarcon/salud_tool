@@ -53,13 +53,25 @@ def test_main_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
             return pd.DataFrame({"date": [datetime(2025, 12, 15).date()]})
 
     def _readings_to_frame(_: list[str]) -> pd.DataFrame:
-        return pd.DataFrame({"date": [datetime(2025, 12, 15).date()]})
+        return pd.DataFrame(
+            {
+                "date": [datetime(2025, 12, 15).date()],
+                "datetime": [pd.Timestamp("2025-12-15 08:00")],
+                "glucose_mg_dl": [100.0],
+            }
+        )
 
-    def _daily_glucose_summary(_: pd.DataFrame) -> pd.DataFrame:
-        return pd.DataFrame({"date": [datetime(2025, 12, 15).date()]})
-
-    def _consolidate_daily(**_: pd.DataFrame) -> pd.DataFrame:
-        return pd.DataFrame({"date": [datetime(2025, 12, 15).date()]})
+    def _consolidate_readings(
+        glucose_events: pd.DataFrame, fit_daily: pd.DataFrame
+    ) -> pd.DataFrame:
+        return pd.DataFrame(
+            {
+                "date": [datetime(2025, 12, 15).date()],
+                "datetime": [pd.Timestamp("2025-12-15 08:00")],
+                "glucose_mg_dl": [100.0],
+                "steps": [1000],
+            }
+        )
 
     captured: dict[str, object] = {}
 
@@ -76,8 +88,7 @@ def test_main_happy_path(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Non
     monkeypatch.setattr(cli, "AccuChekSource", _AccuChekSource)
     monkeypatch.setattr(cli, "GoogleFitSource", _GoogleFitSource)
     monkeypatch.setattr(cli, "readings_to_frame", _readings_to_frame)
-    monkeypatch.setattr(cli, "daily_glucose_summary", _daily_glucose_summary)
-    monkeypatch.setattr(cli, "consolidate_daily", _consolidate_daily)
+    monkeypatch.setattr(cli, "consolidate_readings", _consolidate_readings)
     monkeypatch.setattr(cli, "write_doctor_xlsx", _write_doctor_xlsx)
     monkeypatch.setattr(cli, "datetime", _FixedDatetime)
 

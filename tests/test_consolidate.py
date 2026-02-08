@@ -9,6 +9,7 @@ from salud_tool.consolidate import (
     _min_date,
     build_calendar,
     consolidate_daily,
+    consolidate_readings,
     daily_glucose_summary,
     drop_empty_days,
     readings_to_frame,
@@ -160,3 +161,127 @@ def test_drop_empty_days_empty_and_no_candidate_cols() -> None:
     df = pd.DataFrame({"date": [date(2025, 12, 15)], "other": [1]})
     out = drop_empty_days(df)
     assert out.equals(df)
+
+
+# --- consolidate_readings (una fila por medición) ---
+
+
+def test_consolidate_readings_empty_glucose_returns_empty_with_columns() -> None:
+    out = consolidate_readings(pd.DataFrame(), pd.DataFrame())
+    assert out.empty
+    assert list(out.columns) == [
+        "date",
+        "datetime",
+        "glucose_mg_dl",
+        "steps",
+        "distance_m",
+        "calories_kcal",
+        "active_minutes",
+    ]
+
+
+def test_consolidate_readings_empty_fit_still_returns_one_row_per_reading() -> None:
+    glucose = pd.DataFrame(
+        {
+            "datetime": [
+                pd.Timestamp("2025-12-15 08:00"),
+                pd.Timestamp("2025-12-15 14:00"),
+            ],
+            "date": [date(2025, 12, 15), date(2025, 12, 15)],
+            "glucose_mg_dl": [100.0, 110.0],
+        }
+    )
+    fit = pd.DataFrame(
+        columns=[
+            "date",
+            "steps",
+            "distance_m",
+            "calories_kcal",
+            "active_minutes",
+        ]
+    )
+    out = consolidate_readings(glucose, fit)
+    assert len(out) == 2
+    assert list(out["glucose_mg_dl"]) == [100.0, 110.0]
+    assert out["steps"].isna().all()
+    assert "date" in out.columns
+    assert "datetime" in out.columns
+
+
+def test_consolidate_readings_happy_path_merge_by_date() -> None:
+    glucose = pd.DataFrame(
+        {
+            "datetime": [
+                pd.Timestamp("2025-12-15 08:00"),
+                pd.Timestamp("2025-12-16 09:00"),
+            ],
+            "date": [date(2025, 12, 15), date(2025, 12, 16)],
+            "glucose_mg_dl": [100.0, 105.0],
+        }
+    )
+    fit = pd.DataFrame(
+        {
+            "date": [date(2025, 12, 15), date(2025, 12, 16)],
+            "steps": [1000, 2000],
+            "distance_m": [500.0, 1200.0],
+            "calories_kcal": [80.0, 120.0],
+            "active_minutes": [10.0, 22.0],
+        }
+    )
+    out = consolidate_readings(glucose, fit)
+    assert len(out) == 2
+    assert list(out["glucose_mg_dl"]) == [100.0, 105.0]
+    assert list(out["steps"]) == [1000, 2000]
+    assert list(out["date"]) == [date(2025, 12, 15), date(2025, 12, 16)]
+
+
+def test_consolidate_readings_multiple_readings_same_day_share_fit() -> None:
+    glucose = pd.DataFrame(
+        {
+            "datetime": [
+                pd.Timestamp("2025-12-15 08:00"),
+                pd.Timestamp("2025-12-15 14:00"),
+                pd.Timestamp("2025-12-15 20:00"),
+            ],
+            "date": [date(2025, 12, 15)] * 3,
+            "glucose_mg_dl": [95.0, 102.0, 108.0],
+        }
+    )
+    fit = pd.DataFrame(
+        {
+            "date": [date(2025, 12, 15)],
+            "steps": [5000],
+            "distance_m": [3000.0],
+            "calories_kcal": [150.0],
+            "active_minutes": [45.0],
+        }
+    )
+    out = consolidate_readings(glucose, fit)
+    assert len(out) == 3
+    assert list(out["glucose_mg_dl"]) == [95.0, 102.0, 108.0]
+    assert list(out["steps"]) == [5000, 5000, 5000]
+
+
+def test_consolidate_readings_sorted_by_datetime() -> None:
+    glucose = pd.DataFrame(
+        {
+            "datetime": [
+                pd.Timestamp("2025-12-16 09:00"),
+                pd.Timestamp("2025-12-15 08:00"),
+            ],
+            "date": [date(2025, 12, 16), date(2025, 12, 15)],
+            "glucose_mg_dl": [105.0, 100.0],
+        }
+    )
+    fit = pd.DataFrame(
+        columns=[
+            "date",
+            "steps",
+            "distance_m",
+            "calories_kcal",
+            "active_minutes",
+        ]
+    )
+    out = consolidate_readings(glucose, fit)
+    assert list(out["date"]) == [date(2025, 12, 15), date(2025, 12, 16)]
+    assert list(out["glucose_mg_dl"]) == [100.0, 105.0]

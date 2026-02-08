@@ -13,12 +13,8 @@ _DIA_SEMANA: tuple[str, ...] = ("lun", "mar", "mie", "jue", "vie", "sab", "dom")
 
 _HEADER_MAP: dict[str, str] = {
     "weekday": "Día",
-    "date": "Fecha",
-    "glucose_count": "Mediciones (n)",
-    "glucose_min": "Glucosa mín (mg/dL)",
-    "glucose_max": "Glucosa máx (mg/dL)",
-    "glucose_avg": "Glucosa prom (mg/dL)",
-    "mmol_avg": "Glucosa prom (mmol/L)",
+    "datetime": "Fecha",
+    "glucose_mg_dl": "Glucosa (mg/dL)",
     "steps": "Pasos",
     "distance_m": "Distancia (m)",
     "calories_kcal": "Calorías (kcal)",
@@ -45,20 +41,38 @@ def write_doctor_xlsx(df: pd.DataFrame, out_path: Path, layout: ExcelLayout) -> 
 
     export_df = df.copy()
 
-    # Excel/openpyxl cannot write timezone-aware datetimes.
+    # Día de la semana desde date o datetime
     if "date" in export_df.columns:
-        export_df["weekday"] = pd.to_datetime(export_df["date"]).dt.weekday
-        export_df["weekday"] = export_df["weekday"].map(
-            lambda i: _DIA_SEMANA[i] if 0 <= i < 7 else ""
-        )
+        weekday_series = pd.to_datetime(export_df["date"]).dt.weekday
+    elif "datetime" in export_df.columns:
+        weekday_series = pd.to_datetime(export_df["datetime"]).dt.weekday
+    else:
+        weekday_series = pd.Series(dtype=object)
+
+    if not weekday_series.empty:
+
+        def _weekday_label(i: object) -> str:
+            try:
+                if i is None or (isinstance(i, float) and pd.isna(i)):
+                    return ""
+                if isinstance(i, int | float):
+                    idx = int(i)
+                    return _DIA_SEMANA[idx] if 0 <= idx < 7 else ""
+                return ""
+            except (ValueError, TypeError):
+                return ""
+
+        export_df["weekday"] = weekday_series.map(_weekday_label)
         cols = ["weekday"] + [c for c in export_df.columns if c != "weekday"]
         export_df = export_df[cols]
 
-    # Excel/openpyxl cannot write timezone-aware datetimes.
+    # Fecha con hora: usar datetime y quitar date; Excel sin timezone
     if "datetime" in export_df.columns:
         export_df["datetime"] = pd.to_datetime(
             export_df["datetime"], errors="coerce"
         ).dt.tz_localize(None)
+    if "date" in export_df.columns:
+        export_df = export_df.drop(columns=["date"])
 
     # User-facing headers in Spanish
     export_df = export_df.rename(columns=_HEADER_MAP)
@@ -106,25 +120,18 @@ def _format_sheet(ws: Any) -> None:
     # Widths (avoid ###)
     set_col_width("Día", 6)
     set_col_width("Fecha", 12)
-    set_col_width("Mediciones (n)", 14)
-    set_col_width("Glucosa mín (mg/dL)", 16)
-    set_col_width("Glucosa máx (mg/dL)", 16)
-    set_col_width("Glucosa prom (mg/dL)", 18)
-    set_col_width("Glucosa prom (mmol/L)", 18)
+    set_col_width("Glucosa (mg/dL)", 14)
     set_col_width("Pasos", 12)
     set_col_width("Distancia (m)", 14)
     set_col_width("Calorías (kcal)", 16)
     set_col_width("Minutos activos", 16)
 
     fmt_map: dict[str, str] = {
-        "Mediciones (n)": "0",
-        "Glucosa mín (mg/dL)": "0.00",
-        "Glucosa máx (mg/dL)": "0.00",
-        "Glucosa prom (mg/dL)": "0.00",
-        "Glucosa prom (mmol/L)": "0.00",
+        "Fecha": "dd/mm/yyyy hh:mm",
+        "Glucosa (mg/dL)": "0.00",
         "Pasos": "#,##0",
-        "Distancia (m)": "#,##0.00",
-        "Calorías (kcal)": "#,##0.00",
+        "Distancia (m)": "#,##0",
+        "Calorías (kcal)": "#,##0",
         "Minutos activos": "0",
     }
 

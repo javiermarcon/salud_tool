@@ -62,6 +62,46 @@ def daily_glucose_summary(glucose_events: pd.DataFrame) -> pd.DataFrame:
     return g.sort_values("date").reset_index(drop=True)
 
 
+def consolidate_readings(
+    glucose_events: pd.DataFrame,
+    fit_daily: pd.DataFrame,
+) -> pd.DataFrame:
+    """One row per glucose measurement, with fitness merged by date.
+
+    Args:
+        glucose_events: One row per reading (datetime, date, glucose_mg_dl, ...).
+        fit_daily: Daily metrics (date, steps, distance_m, ...).
+
+    Returns:
+        DataFrame with one row per reading: date, datetime, glucose_mg_dl,
+        steps, distance_m, calories_kcal, active_minutes.
+    """
+    if glucose_events.empty:
+        return pd.DataFrame(
+            columns=[
+                "date",
+                "datetime",
+                "glucose_mg_dl",
+                "steps",
+                "distance_m",
+                "calories_kcal",
+                "active_minutes",
+            ]
+        )
+    out = glucose_events.merge(fit_daily, on="date", how="left")
+    cols = [
+        "date",
+        "datetime",
+        "glucose_mg_dl",
+        "steps",
+        "distance_m",
+        "calories_kcal",
+        "active_minutes",
+    ]
+    out = out[[c for c in cols if c in out.columns]]
+    return out.sort_values("datetime").reset_index(drop=True)
+
+
 def build_calendar(min_day: date, max_day: date) -> pd.DataFrame:
     """Build inclusive day calendar DataFrame."""
     days = pd.date_range(start=min_day, end=max_day, freq="D")
