@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
+from typing import cast
 
 import pandas as pd
 
@@ -92,18 +93,18 @@ def consolidate_daily(
 def _min_date(glucose_daily: pd.DataFrame, fit_daily: pd.DataFrame) -> date:
     mins = []
     if not glucose_daily.empty:
-        mins.append(min(glucose_daily["date"]))
+        mins.append(cast(date, min(glucose_daily["date"])))
     if not fit_daily.empty:
-        mins.append(min(fit_daily["date"]))
+        mins.append(cast(date, min(fit_daily["date"])))
     return min(mins)
 
 
 def _max_date(glucose_daily: pd.DataFrame, fit_daily: pd.DataFrame) -> date:
     maxs = []
     if not glucose_daily.empty:
-        maxs.append(max(glucose_daily["date"]))
+        maxs.append(cast(date, max(glucose_daily["date"])))
     if not fit_daily.empty:
-        maxs.append(max(fit_daily["date"]))
+        maxs.append(cast(date, max(fit_daily["date"])))
     return max(maxs)
 
 
