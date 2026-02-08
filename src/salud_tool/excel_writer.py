@@ -9,7 +9,10 @@ from typing import Any
 import pandas as pd
 from openpyxl.styles import Alignment, Border, Font, Side
 
+_DIA_SEMANA: tuple[str, ...] = ("lun", "mar", "mie", "jue", "vie", "sab", "dom")
+
 _HEADER_MAP: dict[str, str] = {
+    "weekday": "Día",
     "date": "Fecha",
     "glucose_count": "Mediciones (n)",
     "glucose_min": "Glucosa mín (mg/dL)",
@@ -41,6 +44,15 @@ def write_doctor_xlsx(df: pd.DataFrame, out_path: Path, layout: ExcelLayout) -> 
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
     export_df = df.copy()
+
+    # Excel/openpyxl cannot write timezone-aware datetimes.
+    if "date" in export_df.columns:
+        export_df["weekday"] = pd.to_datetime(export_df["date"]).dt.weekday
+        export_df["weekday"] = export_df["weekday"].map(
+            lambda i: _DIA_SEMANA[i] if 0 <= i < 7 else ""
+        )
+        cols = ["weekday"] + [c for c in export_df.columns if c != "weekday"]
+        export_df = export_df[cols]
 
     # Excel/openpyxl cannot write timezone-aware datetimes.
     if "datetime" in export_df.columns:
@@ -92,6 +104,7 @@ def _format_sheet(ws: Any) -> None:
         ws.column_dimensions[letter].width = width
 
     # Widths (avoid ###)
+    set_col_width("Día", 6)
     set_col_width("Fecha", 12)
     set_col_width("Mediciones (n)", 14)
     set_col_width("Glucosa mín (mg/dL)", 16)
