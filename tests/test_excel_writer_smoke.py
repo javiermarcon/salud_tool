@@ -12,7 +12,7 @@ from salud_tool.excel_writer import ExcelLayout, _format_sheet, write_doctor_xls
 
 
 def test_write_doctor_xlsx_happy_path_and_formatting(tmp_path: Path) -> None:
-    """Una fila por medición: Día, Fecha, Glucosa (mg/dL), Pasos, etc."""
+    """Una fila por medición: Día, Fecha / Hora, Glucosa (mg/dL), Pasos, etc."""
     df = pd.DataFrame(
         {
             "date": [
@@ -38,7 +38,7 @@ def test_write_doctor_xlsx_happy_path_and_formatting(tmp_path: Path) -> None:
 
     headers = [cell.value for cell in ws[1]]
     assert headers[0] == "Día"
-    assert "Fecha" in headers
+    assert "Fecha / Hora" in headers
     assert "Glucosa (mg/dL)" in headers
     assert "Pasos" in headers
     assert "datetime" not in headers

@@ -13,12 +13,12 @@ _DIA_SEMANA: tuple[str, ...] = ("lun", "mar", "mie", "jue", "vie", "sab", "dom")
 
 _HEADER_MAP: dict[str, str] = {
     "weekday": "Día",
-    "datetime": "Fecha",
+    "datetime": "Fecha / Hora",
     "glucose_mg_dl": "Glucosa (mg/dL)",
     "steps": "Pasos",
     "distance_m": "Distancia (m)",
-    "calories_kcal": "Calorías (kcal)",
-    "active_minutes": "Minutos activos",
+    "calories_kcal": "Calorías\n(kcal)",
+    "active_minutes": "Minutos\nactivos",
 }
 
 
@@ -95,17 +95,18 @@ def _format_sheet(ws: Any) -> None:
     header_font = Font(bold=True)
     center = Alignment(horizontal="center", vertical="center", wrap_text=True)
 
-    # Header row
+    # Header row (wrap_text ya en center)
     for cell in ws[1]:
         cell.font = header_font
         cell.alignment = center
         cell.border = border
 
-    # Body
+    # Body: alineación y altura reducida
     for row in ws.iter_rows(min_row=2):
         for cell in row:
             cell.alignment = center
             cell.border = border
+        ws.row_dimensions[row[0].row].height = 15
 
     headers = [str(cell.value) for cell in ws[1]]
     col_index = {name: idx + 1 for idx, name in enumerate(headers)}
@@ -117,22 +118,22 @@ def _format_sheet(ws: Any) -> None:
         letter = ws.cell(row=1, column=idx).column_letter
         ws.column_dimensions[letter].width = width
 
-    # Widths (avoid ###)
+    # Widths (evitar ###; Fecha / Hora más ancha; Calorías y Minutos en 2 líneas)
     set_col_width("Día", 6)
-    set_col_width("Fecha", 12)
+    set_col_width("Fecha / Hora", 18)
     set_col_width("Glucosa (mg/dL)", 14)
     set_col_width("Pasos", 12)
     set_col_width("Distancia (m)", 14)
-    set_col_width("Calorías (kcal)", 16)
-    set_col_width("Minutos activos", 16)
+    set_col_width("Calorías\n(kcal)", 10)
+    set_col_width("Minutos\nactivos", 10)
 
     fmt_map: dict[str, str] = {
-        "Fecha": "dd/mm/yyyy hh:mm",
+        "Fecha / Hora": "dd/mm/yyyy hh:mm",
         "Glucosa (mg/dL)": "0.00",
         "Pasos": "#,##0",
         "Distancia (m)": "#,##0",
-        "Calorías (kcal)": "#,##0",
-        "Minutos activos": "0",
+        "Calorías\n(kcal)": "#,##0",
+        "Minutos\nactivos": "0",
     }
 
     for row in ws.iter_rows(min_row=2):
