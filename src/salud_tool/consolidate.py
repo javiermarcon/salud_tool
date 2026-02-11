@@ -20,7 +20,7 @@ class ConsolidationConfig:
 
 
 def readings_to_frame(readings: Sequence[GlucoseReading]) -> pd.DataFrame:
-    """Convert glucose readings to DataFrame with date/time columns."""
+    """Convert glucose readings to DataFrame with date/time and optional tag."""
     rows = [
         {
             "datetime": r.timestamp,
@@ -28,6 +28,7 @@ def readings_to_frame(readings: Sequence[GlucoseReading]) -> pd.DataFrame:
             "time": r.timestamp.time().replace(second=0, microsecond=0),
             "glucose_mg_dl": r.mg_dl,
             "glucose_mmol_l": r.mmol_l,
+            "tag": r.tag,
         }
         for r in readings
     ]
@@ -82,6 +83,7 @@ def consolidate_readings(
                 "date",
                 "datetime",
                 "glucose_mg_dl",
+                "tag",
                 "steps",
                 "distance_m",
                 "calories_kcal",
@@ -93,6 +95,7 @@ def consolidate_readings(
         "date",
         "datetime",
         "glucose_mg_dl",
+        "tag",
         "steps",
         "distance_m",
         "calories_kcal",

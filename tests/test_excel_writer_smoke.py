@@ -24,6 +24,7 @@ def test_write_doctor_xlsx_happy_path_and_formatting(tmp_path: Path) -> None:
                 pd.Timestamp("2025-12-16 09:45", tz="UTC"),
             ],
             "glucose_mg_dl": [105.0, 100.0],
+            "tag": ["Antes comida", "Desp. Comida"],
             "steps": [1000, 2000],
             "distance_m": [500.0, 1200.0],
             "calories_kcal": [120.0, 150.0],
@@ -40,12 +41,16 @@ def test_write_doctor_xlsx_happy_path_and_formatting(tmp_path: Path) -> None:
     assert headers[0] == "Día"
     assert "Fecha / Hora" in headers
     assert "Glucosa (mg/dL)" in headers
+    assert "Tag" in headers
+    assert headers.index("Tag") == headers.index("Glucosa (mg/dL)") + 1
     assert "Pasos" in headers
     assert "datetime" not in headers
 
     assert ws.cell(row=2, column=1).value == "lun"
     gluc_col = headers.index("Glucosa (mg/dL)") + 1
     assert ws.cell(row=2, column=gluc_col).value == 105.0
+    tag_col = headers.index("Tag") + 1
+    assert ws.cell(row=2, column=tag_col).value == "Antes comida"
 
     assert ws.column_dimensions["A"].width == 6
     pasos_letter = get_column_letter(headers.index("Pasos") + 1)

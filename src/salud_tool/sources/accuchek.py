@@ -54,33 +54,53 @@ class AccuChekSource(DataSource):
         Raises:
             ValueError: If JSON shape is invalid.
         """
-        raw: Any = json.loads(path.read_text(encoding="utf-8"))
+        text = path.read_text(encoding="utf-8")
+        raw = _extract_json_list(text)
         if not isinstance(raw, list):
             raise ValueError("Accu-Chek JSON must be a list")
 
         out: list[GlucoseReading] = []
         for item in raw:
-            if not isinstance(item, dict):
-                continue
-            ts_str = item.get("timestamp")
-            epoch = item.get("epoch")
-            mg_dl = item.get("mg/dL")
-            mmol_l = item.get("mmol/L")
-
-            if mg_dl is None or mmol_l is None:
-                continue
-
-            ts = _parse_timestamp(ts_str, epoch)
-            out.append(
-                GlucoseReading(
-                    timestamp=ts,
-                    mg_dl=float(mg_dl),
-                    mmol_l=float(mmol_l),
-                )
-            )
-
+            reading = _item_to_reading(item)
+            if reading is not None:
+                out.append(reading)
         out.sort(key=lambda r: r.timestamp)
         return out
+
+
+def _parse_tag(item: dict[str, Any]) -> str | None:
+    """Extrae y normaliza el tag de un ítem (vacío -> None)."""
+    tag_val = item.get("tag")
+    if tag_val is None:
+        return None
+    tag = str(tag_val).strip()
+    return tag if tag else None
+
+
+def _item_to_reading(item: Any) -> GlucoseReading | None:
+    """Convierte un ítem dict en GlucoseReading; None si falta mg/dL o mmol/L."""
+    if not isinstance(item, dict):
+        return None
+    mg_dl = item.get("mg/dL")
+    mmol_l = item.get("mmol/L")
+    if mg_dl is None or mmol_l is None:
+        return None
+    ts = _parse_timestamp(item.get("timestamp"), item.get("epoch"))
+    tag = _parse_tag(item)
+    return GlucoseReading(
+        timestamp=ts,
+        mg_dl=float(mg_dl),
+        mmol_l=float(mmol_l),
+        tag=tag,
+    )
+
+
+def _extract_json_list(text: str) -> Any:
+    """Extract JSON array from text, tolerating leading non-JSON (e.g. log lines)."""
+    start = text.find("[")
+    if start >= 0:
+        return json.loads(text[start:])
+    return json.loads(text)
 
 
 def _parse_timestamp(ts_str: Any, epoch: Any) -> datetime:

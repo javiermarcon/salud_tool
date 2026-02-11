@@ -13,6 +13,7 @@ class GlucoseReading:
     timestamp: datetime
     mg_dl: float
     mmol_l: float
+    tag: str | None = None
 
 
 @dataclass(frozen=True)

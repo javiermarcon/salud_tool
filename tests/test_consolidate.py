@@ -39,6 +39,29 @@ def test_readings_to_frame_orders_and_truncates_time() -> None:
     assert list(df["date"]) == [date(2025, 12, 15), date(2025, 12, 16)]
     assert list(df["time"])[0].second == 0
     assert list(df["time"])[0].microsecond == 0
+    assert "tag" in df.columns
+    assert df["tag"].isna().all()
+
+
+def test_readings_to_frame_includes_tag() -> None:
+    readings = [
+        GlucoseReading(
+            timestamp=datetime(2025, 12, 15, 8, 0),
+            mg_dl=100.0,
+            mmol_l=5.55,
+            tag="Antes comida",
+        ),
+        GlucoseReading(
+            timestamp=datetime(2025, 12, 15, 14, 0),
+            mg_dl=120.0,
+            mmol_l=6.66,
+            tag=None,
+        ),
+    ]
+    df = readings_to_frame(readings)
+    assert list(df["tag"].iloc[0:1]) == ["Antes comida"]
+    assert pd.isna(df["tag"].iloc[1])
+    assert list(df["glucose_mg_dl"]) == [100.0, 120.0]
 
 
 def test_daily_glucose_summary_empty() -> None:
@@ -173,6 +196,7 @@ def test_consolidate_readings_empty_glucose_returns_empty_with_columns() -> None
         "date",
         "datetime",
         "glucose_mg_dl",
+        "tag",
         "steps",
         "distance_m",
         "calories_kcal",

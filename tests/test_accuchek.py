@@ -8,6 +8,7 @@ import pytest
 from salud_tool.sources.accuchek import (
     AccuChekPaths,
     AccuChekSource,
+    _extract_json_list,
     _parse_timestamp,
 )
 
@@ -178,3 +179,62 @@ def test_parse_timestamp_empty_string_uses_epoch() -> None:
 def test_parse_timestamp_missing_both_raises() -> None:
     with pytest.raises(ValueError, match="Missing timestamp"):
         _parse_timestamp(None, None)
+
+
+def test_load_readings_parses_tag_when_present(tmp_path: Path) -> None:
+    p = tmp_path / "with_tag.json"
+    data = [
+        {
+            "timestamp": "2026/01/31 08:00",
+            "mg/dL": 100,
+            "mmol/L": 5.55,
+            "tag": "Antes comida",
+        },
+        {
+            "timestamp": "2026/01/31 14:00",
+            "mg/dL": 118,
+            "mmol/L": 6.55,
+            "tag": "Desp. Comida",
+        },
+    ]
+    p.write_text(json.dumps(data), encoding="utf-8")
+    src = AccuChekSource(AccuChekPaths(root=tmp_path))
+    readings = src.load_readings(p)
+    assert len(readings) == 2
+    assert readings[0].tag == "Antes comida"
+    assert readings[1].tag == "Desp. Comida"
+
+
+def test_load_readings_tag_optional_without_key(tmp_path: Path) -> None:
+    p = tmp_path / "no_tag.json"
+    data = [{"timestamp": "2026/01/31 08:00", "mg/dL": 100, "mmol/L": 5.55}]
+    p.write_text(json.dumps(data), encoding="utf-8")
+    src = AccuChekSource(AccuChekPaths(root=tmp_path))
+    readings = src.load_readings(p)
+    assert len(readings) == 1
+    assert readings[0].tag is None
+
+
+def test_load_readings_tag_empty_string_becomes_none(tmp_path: Path) -> None:
+    p = tmp_path / "empty_tag.json"
+    data = [{"timestamp": "2026/01/31 08:00", "mg/dL": 100, "mmol/L": 5.55, "tag": ""}]
+    p.write_text(json.dumps(data), encoding="utf-8")
+    src = AccuChekSource(AccuChekPaths(root=tmp_path))
+    readings = src.load_readings(p)
+    assert readings[0].tag is None
+
+
+def test_extract_json_list_pure_json() -> None:
+    raw = _extract_json_list("[1, 2, 3]")
+    assert raw == [1, 2, 3]
+
+
+def test_extract_json_list_with_leading_garbage() -> None:
+    text = (
+        "0.594510(   +0.000000):info: running as non-root\n"
+        '[{"mg/dL": 100, "mmol/L": 5.55}]'
+    )
+    raw = _extract_json_list(text)
+    assert isinstance(raw, list)
+    assert len(raw) == 1
+    assert raw[0]["mg/dL"] == 100
