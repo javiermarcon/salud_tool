@@ -189,7 +189,7 @@ def test_drop_empty_days_empty_and_no_candidate_cols() -> None:
 # --- consolidate_readings (una fila por medición) ---
 
 
-def test_consolidate_readings_empty_glucose_returns_empty_with_columns() -> None:
+def test_consolidate_readings_both_empty_returns_empty() -> None:
     out = consolidate_readings(pd.DataFrame(), pd.DataFrame())
     assert out.empty
     assert list(out.columns) == [
@@ -202,6 +202,27 @@ def test_consolidate_readings_empty_glucose_returns_empty_with_columns() -> None
         "calories_kcal",
         "active_minutes",
     ]
+
+
+def test_consolidate_readings_fit_only_shows_fit_rows() -> None:
+    """Si no hay glucosa pero sí Fit, muestra filas de Fit con glucosa NaN."""
+    glucose = pd.DataFrame(columns=["date", "datetime", "glucose_mg_dl", "tag"])
+    fit = pd.DataFrame(
+        {
+            "date": [date(2025, 12, 15), date(2025, 12, 16)],
+            "steps": [1000, 2000],
+            "distance_m": [500.0, 1200.0],
+            "calories_kcal": [80.0, 120.0],
+            "active_minutes": [10.0, 22.0],
+        }
+    )
+    out = consolidate_readings(glucose, fit)
+    assert len(out) == 2
+    assert list(out["date"]) == [date(2025, 12, 15), date(2025, 12, 16)]
+    assert list(out["steps"]) == [1000, 2000]
+    assert out["glucose_mg_dl"].isna().all()
+    assert out["tag"].isna().all()
+    assert "datetime" in out.columns
 
 
 def test_consolidate_readings_empty_fit_still_returns_one_row_per_reading() -> None:
@@ -309,3 +330,43 @@ def test_consolidate_readings_sorted_by_datetime() -> None:
     out = consolidate_readings(glucose, fit)
     assert list(out["date"]) == [date(2025, 12, 15), date(2025, 12, 16)]
     assert list(out["glucose_mg_dl"]) == [100.0, 105.0]
+
+
+def test_consolidate_readings_mixed_days_glucose_and_fit_only() -> None:
+    """Días con glucosa, días solo con Fit, días con ambas, días sin ninguna."""
+    glucose = pd.DataFrame(
+        {
+            "datetime": [
+                pd.Timestamp("2025-12-15 08:00"),
+                pd.Timestamp("2025-12-15 14:00"),
+                pd.Timestamp("2025-12-17 09:00"),
+            ],
+            "date": [date(2025, 12, 15), date(2025, 12, 15), date(2025, 12, 17)],
+            "glucose_mg_dl": [100.0, 110.0, 105.0],
+            "tag": ["Antes comida", "Desp. Comida", None],
+        }
+    )
+    fit = pd.DataFrame(
+        {
+            "date": [date(2025, 12, 15), date(2025, 12, 16), date(2025, 12, 17)],
+            "steps": [2000, 3000, 1500],
+            "distance_m": [1000.0, 2000.0, 800.0],
+            "calories_kcal": [100.0, 150.0, 80.0],
+            "active_minutes": [20.0, 30.0, 15.0],
+        }
+    )
+    out = consolidate_readings(glucose, fit)
+    # Día 15: 2 mediciones glucosa + Fit
+    # Día 16: solo Fit (sin glucosa)
+    # Día 17: 1 medición glucosa + Fit
+    # Total: 4 filas (2 + 1 + 1)
+    assert len(out) == 4
+    dates = list(out["date"])
+    assert dates.count(date(2025, 12, 15)) == 2
+    assert dates.count(date(2025, 12, 16)) == 1
+    assert dates.count(date(2025, 12, 17)) == 1
+    # Día 16 solo tiene Fit, glucosa debe ser NaN
+    day_16_rows = out[out["date"] == date(2025, 12, 16)]
+    assert len(day_16_rows) == 1
+    assert pd.isna(day_16_rows.iloc[0]["glucose_mg_dl"])
+    assert day_16_rows.iloc[0]["steps"] == 3000
