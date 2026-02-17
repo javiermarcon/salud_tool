@@ -1,19 +1,17 @@
 # Salud Tool
 
-Genera un Excel listo para imprimir o compartir con tu médico a partir de los datos del **glucómetro Accu-Chek** y de **Google Fit**. Una fila por cada medición de glucosa, con fecha/hora, valor en mg/dL y las métricas de actividad del día (pasos, distancia, calorías, minutos activos).
+App Kivy para consolidar datos de **Accu-Chek** y **Google Fit**, persistir todo en **SQLite** y exportar a Excel. Una fila por cada medicion de glucosa con fecha/hora, valor en mg/dL y metricas de actividad del dia (pasos, distancia, calorias, minutos activos).
 
 ## ¿Qué hace?
 
 - **Lee** las exportaciones JSON del Accu-Chek (glucosa en sangre).
 - **Lee** las métricas diarias de Google Fit (Takeout: pasos, distancia, calorías, minutos activos).
-- **Une** cada medición de glucosa con las métricas del mismo día.
-- **Escribe** un archivo `.xlsx` formateado con:
-  - Día de la semana (lun, mar, mie…)
-  - Fecha / hora de cada medición
-  - Glucosa (mg/dL)
-  - Pasos, distancia, calorías y minutos activos del día
+- **Une** cada medicion de glucosa con las metricas del mismo dia.
+- **Guarda** configuracion (paths y campos visibles) en SQLite.
+- **Guarda** en SQLite todo lo procesado en cada corrida, incluso si no se muestra en pantalla.
+- **Permite** elegir campos visibles por fuente y exportar esos campos a `.xlsx`.
 
-El Excel queda pensado para revisión médica o para llevar un registro ordenado en una sola hoja.
+El Excel queda pensado para revision medica o para llevar un registro ordenado en una sola hoja.
 
 ## Requisitos
 
@@ -54,30 +52,38 @@ cd salud_tool
 pip install -e .
 ```
 
-Dependencias principales: `pandas`, `openpyxl`, `python-dateutil`.
+Dependencias principales: `kivy`, `pandas`, `openpyxl`, `python-dateutil`.
 
 ## Uso
 
-Desde la raíz del proyecto:
+Desde la raiz del proyecto:
 
 ```bash
 python -m salud_tool
 ```
 
-O indicando otro directorio base:
+Tambien podes ejecutarla asi:
 
 ```bash
-python -m salud_tool --base-dir /ruta/a/mis/datos
+python app.py
 ```
 
-Opciones:
+La app permite:
+- Configurar path de Accu-Chek (directorio con `accuchek_*.json`).
+- Configurar path de Google Fit (`.../Takeout/Fit`).
+- Configurar directorio de exportacion.
+- Elegir campos a mostrar y exportar.
+- Procesar datos y guardar corrida en `salud_tool.sqlite3`.
 
-| Opción         | Descripción                                      | Por defecto           |
-|----------------|---------------------------------------------------|------------------------|
-| `--base-dir`   | Directorio base (glucosa, fit, salidas)           | `~/proyectos/salud`   |
-| `--days`       | Días hacia atrás (informativo por ahora)          | `365`                  |
+En la pantalla principal tenes el boton `Configuracion`, que abre un menu lateral
+con pestañas separadas:
+- `General`: directorio de exportacion.
+- `Accu-Chek`: path de origen + campos de esa fuente.
+- `Google Fit`: path de origen + campos de esa fuente.
+- `Base`: campos comunes (`date`, `datetime`).
 
-Al terminar se imprime la ruta del archivo Accu-Chek usado, la cantidad de CSV de Fit y la ruta del Excel generado.
+Los paths se pueden escribir completos o elegir con file browser.
+La app incluye boton `Salir`; con `Esc` salis de fullscreen o cerras la app.
 
 ## Desarrollo
 

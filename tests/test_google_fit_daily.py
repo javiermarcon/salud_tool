@@ -101,6 +101,17 @@ def test_daily_metrics_files_happy_path_excludes_summary(tmp_path: Path) -> None
     assert files == [day_a, day_b]
 
 
+def test_daily_metrics_files_accepts_metrics_dir_as_root(tmp_path: Path) -> None:
+    metrics = tmp_path / "Métricas de actividad diaria"
+    metrics.mkdir(parents=True)
+    day_file = metrics / "2025-12-15.csv"
+    _write_csv(day_file, {"Pasos": [1]})
+
+    source = GoogleFitSource(GoogleFitPaths(root=metrics))
+    files = source.daily_metrics_files()
+    assert files == [day_file]
+
+
 def test_load_daily_skips_bad_filenames_and_empty() -> None:
     source = GoogleFitSource(GoogleFitPaths(root=Path(".")))
     out = source.load_daily([Path("no-date.csv")])

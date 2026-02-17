@@ -30,9 +30,10 @@ class GoogleFitSource(DataSource):
 
     def daily_metrics_files(self) -> list[Path]:
         """Return per-day CSV files for daily activity metrics."""
-        metrics_dir = self._paths.root / "Métricas de actividad diaria"
-        if not metrics_dir.exists():
-            raise FileNotFoundError(str(metrics_dir))
+        metrics_dir = _resolve_metrics_dir(self._paths.root)
+        if metrics_dir is None:
+            expected = self._paths.root / "Métricas de actividad diaria"
+            raise FileNotFoundError(str(expected))
 
         files = sorted(
             p
@@ -124,3 +125,32 @@ def _date_from_filename(path: Path) -> date | None:
     if pd.isna(parsed):
         return None
     return cast(date, parsed.date())
+
+
+def _resolve_metrics_dir(root: Path) -> Path | None:
+    """Resolve daily metrics directory from flexible user-selected roots."""
+    if not root.exists():
+        return None
+    if root.is_dir() and _is_metrics_dir(root):
+        return root
+
+    candidates = [
+        root / "Métricas de actividad diaria",
+        root / "Metricas de actividad diaria",
+        root / "Takeout" / "Fit" / "Métricas de actividad diaria",
+        root / "Takeout" / "Fit" / "Metricas de actividad diaria",
+        root / "Fit" / "Métricas de actividad diaria",
+        root / "Fit" / "Metricas de actividad diaria",
+    ]
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_dir():
+            return candidate
+    return None
+
+
+def _is_metrics_dir(path: Path) -> bool:
+    normalized = path.name.casefold()
+    return normalized in {
+        "métricas de actividad diaria".casefold(),
+        "metricas de actividad diaria".casefold(),
+    }
